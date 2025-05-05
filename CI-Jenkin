@@ -1,0 +1,52 @@
+pipeline {
+    agent any
+
+    parameters {
+        string(name: 'DOCKER_TAG', defaultValue: 'latest', description: 'Docker Image Tag - JenkinFile for Service A')
+    }
+
+    environment {
+        IMAGE_NAME = "bala0306/service_a:${params.DOCKER_TAG}"
+    }
+
+    stages {
+        stage('Clone') {
+            steps {
+        git branch: 'main', url: 'https://github.com/Bala0319/Service_A.git'
+    }
+        }
+
+        stage('Build') {
+            steps {
+                sh './mvnw clean package -DskipTests'
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                sh "docker build -t ${IMAGE_NAME} ."
+            }
+        }
+
+        stage('Docker Push') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
+                    sh "docker push ${IMAGE_NAME}"
+                }
+            }
+        }
+
+        stage('Clean Workspace') {
+            steps {
+                cleanWs()
+            }
+        }
+    }
+
+    post {
+        success {
+            build job: 'CD-Service-A', parameters: [string(name: 'DOCKER_TAG', value: "${params.DOCKER_TAG}")]
+        }
+    }
+}
